@@ -1,0 +1,27 @@
+coreutils
+autoconf
+automake
+libtool
+findutils
+zsh
+git
+neovim
+llvm
+ripgrep
+pv
+tree
+hub
+ccls
+hyperkit
+docker
+speedtest-cli
+qlimagesize
+suspicious-package
+apparency
+betterzip
+yt-dlp
+zopfli
+wireguard-tools
+tldr
+
+$(brew --prefix)/opt/fzf/install

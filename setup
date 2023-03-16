@@ -1,0 +1,260 @@
+#!/usr/bin/env zsh
+
+# Logging fuction helpers for the script (primary, secondary, tertiary)
+function __p () { echo -e "\033[36m$1\033[0m" }
+function __s () { echo -e "\033[33m$1\033[0m" }
+function __t () { echo -e "\033[92m$1\033[0m" }
+
+# //////////////
+__p '
+                                           _               
+                                          | |              
+  _ __ ___   __ _  ___ ___  ___   ___  ___| |_ _   _ _ __  
+ | |_ ` _ \ / _` |/ __/ _ \/ __| / __|/ _ \ __| | | | |_ \ 
+ | | | | | | (_| | (_| (_) \__ \ \__ \  __/ |_| |_| | |_) |
+ |_| |_| |_|\__,_|\___\___/|___/ |___/\___|\__|\__,_| .__/ 
+                                                    | |    
+                                                    |_|    
+'
+
+# //////////////////////////////////////////////////////////////////////////// #
+
+
+__t "\nEnter your password to begin with the installation\n"
+
+# Ask for sudo beforehand, so that the script doesn't halt installation in the
+# later sections.
+sudo -v
+
+# Keep sudo session persistent, taken from -- https://gist.github.com/cowboy/3118588
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+# Create bin directory in home
+[ ! -d $HOME/bin ] && mkdir $HOME/bin
+
+
+__s "Setting up OS defaults"
+
+# Sets macOS defaults by running set-defaults.sh
+# Load and source FZF configs
+[ -f ./set-osx-defaults.sh ] && source ./set-osx-defaults.sh
+
+__p '
+  ____        _ _     _   _              _     
+ |  _ \      (_) |   | | | |            | |    
+ | |_) |_   _ _| | __| | | |_ ___   ___ | |___ 
+ |  _ <| | | | | |/ _` | | __/ _ \ / _ \| / __|
+ | |_) | |_| | | | (_| | | || (_) | (_) | \__ \
+ |____/ \__,_|_|_|\__,_|  \__\___/ \___/|_|___/
+ ----------------------------------------------
+ Installing tools + libraries required for getting language support -- includes
+ MacOS SDK, C/C++ headers, Compilers (LLVM), Interpreters, and System package 
+ manager (homebrew).
+
+'
+
+
+# Install Xcode-select (xcode command line tools) if  not already installed
+__s "\nVerifying xcode command line tools installation"
+if ! xcode-select -p 2>/dev/null; then
+	# Install the xcode command line tools - xcode-select is the eaisest way.
+    __s "Installing XCode Command Line tools using default xcode-select"
+    xcode-select --install
+
+    # Wait for system to install the command line tools (this is to halt the
+    # script until tools aren't installed).
+    __s "The Installation is currently in progress, Click Agree on the prompt."
+    while ! xcode-select -p 2>/dev/null; do sleep 5; done
+
+    # Verify the installation (the loop will only break when the path for the
+    # tools will be found, therefore, no extra verfication needed)
+    __t "XCode Command line tools successfully installed."
+fi
+
+# Install brew.sh (system package manager) if already not installed
+__s "\nVerifying homebrew installation and updating to the latest version"
+if ! brew -v 2>/dev/null; then
+	# Install homebrew using the method specified at https://brew.sh/
+	__s "Installing Homebrew -- system package manager for macOS."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+fi
+
+# Update brew to latest available version
+brew update
+
+
+# Update shell to latest zsh
+if [[ " $@ " =~ " --update-shell " ]]; then
+	__s "Changing $SHELL to zsh"
+
+	# Install the latest zsh shell
+	brew install zsh
+
+	# Chanage the default shell to zsh installed by Homebrew (macos may ship with
+	# older version, therefore update the zsh)
+	BREW_PREFIX=$(brew --prefix)
+	if ! fgrep -q "${BREW_PREFIX}/bin/zsh" /etc/shells; then
+	  echo "${BREW_PREFIX}/bin/zsh" | sudo tee -a /etc/shells;
+	  chsh -s "${BREW_PREFIX}/bin/zsh";
+	fi
+fi
+
+__p '
+  _____        _    __ _ _           
+ |  __ \      | |  / _(_) |          
+ | |  | | ___ | |_| |_ _| | ___  ___ 
+ | |  | |/ _ \| __|  _| | |/ _ \/ __|
+ | |__| | (_) | |_| | | | |  __/\__ \
+ |_____/ \___/ \__|_| |_|_|\___||___/
+ ------------------------------------
+ Elegant way to manage and share dotfiles across machines using a single git 
+ repository                    
+'
+
+# The trick behind the mangement of dotfiles is cloning it as a bare repository
+# therefore, first, we need to define some arguments for the git command. The
+# location for the dotfiles is under $HOME directory.
+alias dotfiles="/usr/bin/git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
+
+# Brachs gives us the functionality to create profiles of dotfiles for machines
+# main is for macos, linux is for ubuntu etc.
+DF_BRANCH="main"
+
+# Bring the dotfiles from hosted repository if not already present
+if [ ! -d "$HOME/.dotfiles" ]; then
+    /usr/bin/git clone --bare https://github.com/mrtkrcm/dotfiles.git $HOME/.dotfiles
+fi
+
+# Reset the unstagged changes before updating (TODO: experiment with stash)
+if [[ " $@ " =~ " --dotfiles-reset " ]]; then
+    dotfiles reset --hard
+fi
+
+# Activate the profile for the current dev machine and Update the dotfiles with
+# remote repository
+dotfiles config status.showUntrackedFiles no
+dotfiles checkout $DF_BRANCH
+dotfiles pull origin $DF_BRANCH
+
+
+__p '
+  ____  _                       _____          _        
+ |  _ \(_)             ___     / ____|        | |       
+ | |_) |_ _ __  ___   ( _ )   | |     __ _ ___| | _____ 
+ |  _ <| | |_ \/ __|  / _ \/\ | |    / _` / __| |/ / __|
+ | |_) | | | | \__ \ | (_>  < | |___| (_| \__ \   <\__ \
+ |____/|_|_| |_|___/  \___/\/  \_____\__,_|___/_|\_\___/
+                                                        
+ This section deals with the installation of all the binaries and casks.
+
+'
+
+# Brew Binaries - these are binaries that are available as brew formula. A list
+# of these formulas are stored in the bins.txt file under ~/.config/mrtkrcm
+# ~ Note ~ : this file is automatically updates with everytime brew installs or
+# removes a binary
+bins=( $(cut -d '=' -f1 $HOME/.dotfiles/.config/mrtkrcm/bins.txt) )
+
+# Brew Casks - these are the casks that are available as brew formula. A list
+# of these casks are stored in the casks.txt under ~/.config/mrtkrcm folder.
+# ~ Note ~ : this file is automatically updates with everytime brew installs or
+# removes a casks
+casks=( $(cut -d '=' -f1 $HOME/.dotfiles/.config/mrtkrcm/casks.txt) )
+
+# required to properly install coreutils
+export PATH="$(brew --prefix coreutils)/libexec/gnubin:/usr/local/bin:$PATH"
+
+# Install binaries using Homebrew, iterate over bins array and install.
+__p "Installing the following binaries $bins"
+for binary in "${bins[@]}"; do
+    # split the brew formula into binary name and version of installation and
+    # get the name of the binary (ex- php in php@7.4)
+    b=`echo $binary | cut -d \@ -f 1`
+    # check if the binary is already present, otherwise install
+    if ! brew list --formula | grep "$b" 1>/dev/null; then
+        brew install "$binary"
+    fi
+done
+
+# Install casks using Homebrew, iterate over casks array and install.
+for c in "${casks[@]}"; do
+    # first, check if the cask is present or not, if not install
+    if ! brew list --cask | grep "$c" 1>/dev/null; then
+        brew install --cask "$c"
+    fi
+done
+
+# Install binaries using Volta/NPM, iterate over package id array and install.
+# npm ls --global --parseable --depth=0 | awk '{gsub(/\/.*\//,"",$1); print}' | sort -u
+packages=(
+  zx
+  jq
+  @antfu/ni
+  @lhci/cli
+  cross-env
+  depcheck
+  dtslint
+  dts-gen
+  eslint
+  gzip-size-cli
+  json-server
+  markdownlint-cli2
+  nodemon
+  npm-check-updates
+  npm-name-cli
+  prettier
+  stylelint
+  typescript
+  @antfu/ni
+)
+
+__p "Installing the following NPM packages $packages"
+
+for p in "${packages[@]}"; do
+  volta run --no-yarn -- npm install --global "$p" || echo "$p not found"
+done
+
+unset p packages
+
+volta list all
+
+__p '
+  _____          _     _           _        _ _       _   _             
+ |  __ \        | |   (_)         | |      | | |     | | (_)            
+ | |__) |__  ___| |_   _ _ __  ___| |_ __ _| | | __ _| |_ _  ___  _ __  
+ |  ___/ _ \/ __| __| | | |_ \/ __| __/ _` | | |/ _` | __| |/ _ \| |_ \ 
+ | |  | (_) \__ \ |_  | | | | \__ \ || (_| | | | (_| | |_| | (_) | | | |
+ |_|   \___/|___/\__| |_|_| |_|___/\__\__,_|_|_|\__,_|\__|_|\___/|_| |_|
+                                                                        
+ This section deals with the setup of specific binaries after installation  
+
+'
+
+# Post-Installation for Node Version Manager (NVM)
+if [[ " ${bins[@]} " =~ " nvm " ]]; then
+    [ ! -d ~/.nvm ] && mkdir ~/.nvm
+    # source the nvm.sh file to add nvm in path
+    [ -s "/usr/local/opt/nvm/nvm.sh" ] && . "/usr/local/opt/nvm/nvm.sh"
+    # Install lts support for nodejs, yarn and update npm
+    nvm install --lts
+    npm install -g npm yarn
+fi
+
+# Post-Installation for Node Version Manager (Volta)
+if [[ " ${bins[@]} " =~ " volta " ]]; then
+    curl https://get.volta.sh | bash -s -- --skip-setup
+
+    volta install node@latest # remove when LTS officially supports arm64
+    volta install npm@8
+    volta install yarn@3
+    volta fetch node@lts # not native on M1 but good to have
+
+    volta list node
+    volta list npm
+    volta list yarn
+fi
+
+#
+#
+# DONE
+[ -f ~/.zshrc ] && source ~/.zshrc

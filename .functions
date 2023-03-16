@@ -1,0 +1,75 @@
+#!/usr/bin/env zsh
+
+## ls after a cd
+function cd() {
+    builtin cd "$*" && ls
+}
+
+function cda() {
+    builtin cd "$*" && ls -a
+}
+
+## Color man pages
+man() {
+    env \
+        LESS_TERMCAP_mb=$(printf "\e[1;31m") \
+        LESS_TERMCAP_md=$(printf "\e[1;31m") \
+        LESS_TERMCAP_me=$(printf "\e[0m") \
+        LESS_TERMCAP_se=$(printf "\e[0m") \
+        LESS_TERMCAP_so=$(printf "\e[1;44;33m") \
+        LESS_TERMCAP_ue=$(printf "\e[0m") \
+        LESS_TERMCAP_us=$(printf "\e[1;32m") \
+            man "$@"
+}
+
+## Make a new directory and `cd` right into it
+function mkcd {
+  if [ ! -n "$1" ]; then
+    echo "Enter a directory name."
+  elif [ -d $1 ]; then
+    echo "\`$1' exist!"
+  else
+    mkdir -p $1 && cd $1
+  fi
+}
+
+# Find the git branch
+function git_branch {
+    [ -d "$PWD/.git" ] && /usr/bin/git branch 2>/dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/%F{2} (%f%F{11}\1%f%F{2})%f/'
+}
+
+function _resolve_fzf_colorscheme {
+    if [[ $TERM =~ "xterm-256color" ]]; then
+        echo "--color fg:223,bg:-1,hl:66,fg+:166,bg+:-1,hl+:208
+              --color info:183,prompt:110,spinner:107,pointer:167,marker:215,border:223"
+    else
+        echo "--color fg:#ebdbb2,bg:-1,hl:#458588,fg+:#d65d0e,bg+:-1,hl+:#fabd2f \
+              --color info:#83a598,prompt:#bdae93,spinner:#fabd2f,pointer:#83a598,marker:#fe8019,header:#665c54,border:#ebdbb2"
+    fi
+}
+
+# Netjoin - Block until a network connection is obtained.
+# Originally from https://github.com/bamos/dotfiles/blob/master/.funcs
+function nj() {
+    while true; do
+        ping -c 1 8.8.8.8 &>/dev/null && break
+        sleep 1
+    done
+}
+
+# lists zombie processes
+function zombie() {
+    ps aux | awk '{if ($8=="Z") { print $2 }}'
+}
+alias zombies=zombie
+
+# Push a local SSH public key to another machine
+# https://github.com/rtomayko/dotfiles/blob/rtomayko/.bashrc
+push_ssh_cert() {
+  local _host
+  [[ -f ~/.ssh/id_ed25519.pub ]] || ssh-keygen -t ed25519
+  for _host in "$@"; do
+    echo "$_host"
+    ssh "$_host" "\cat >> ~/.ssh/authorized_keys" < ~/.ssh/id_ed25519.pub
+  done
+}

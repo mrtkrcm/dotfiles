@@ -1,0 +1,72 @@
+.zsh_history
+
+# Always ignore
+.*/
+.gitconfig.local
+node_modules/
+Library/
+Desktop/
+bin/aws-cli
+bin/google-cloud-sdk
+bin/runn
+Documents/
+Downloads/
+Dropbox/
+Movies/
+Music/
+Parallels/
+Pictures/
+Public/
+Sites/
+Applications/
+AndroidStudio/
+AndroidStudioProjects/
+code/
+
+# Whitelist some files
+!.gitignore
+!.gitignore_global
+!.gitconfig
+!.zshrc
+!.zshenv
+!.zprofile
+!.curlrc
+!.aliases
+!.exports
+!.functions
+
+!set-osx-defaults.sh
+!setup
+!utils.sh
+!README.md
+
+#Only Include these specific (sub)directories and files
+!.config/
+# !.config/*/
+.config/nvm
+!.config/mrtkrcm/*
+.config/iterm2/*
+!.config/iterm2/com.googlecode.iterm2.plist
+!.config/nvim
+.config/raycast/extensions/*
+.config/gcloud
+
+# vscode
+!.vscode/settings.json
+.vscode/extensions
+.vscode/argv.json
+
+### macOS ###
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# zsh
+.zcompdump
+.history
+
+# rest
+.nuuid.ini
+.emulator_console_auth_token
+

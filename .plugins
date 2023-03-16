@@ -1,0 +1,174 @@
+#!/usr/bin/env zsh
+####################################################################################################
+#
+# zinit - the fastest plugin manager but also the most complex
+# https://github.com/zdharma/zinit
+
+if [[ ! -f $HOME/.zi/bin/zi.zsh ]]; then
+  print -P "%F{33}▓▒░ %F{160}Installing (%F{33}z-shell/zi%F{160})…%f"
+  command mkdir -p "$HOME/.zi" && command chmod go-rwX "$HOME/.zi"
+  command git clone -q --depth=1 --branch "main" https://github.com/z-shell/zi "$HOME/.zi/bin" && \
+    print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
+    print -P "%F{160}▓▒░ The clone has failed.%f%b"
+fi
+source "$HOME/.zi/bin/zi.zsh"
+autoload -Uz _zi
+(( ${+_comps} )) && _comps[zi]=_zi
+
+zicompinit # <- https://wiki.zshell.dev/docs/guides/commands
+#
+#
+####################################################################################################
+
+# Plugins
+# ------------------
+# zi light-mode for skip'skim-cargo peco-go' z-a-meta-plugins \
+zi light-mode for z-shell/z-a-meta-plugins @annexes \
+  @z-shell \
+  @ext-git \
+  skip'skim-cargo peco-go' @sharkdp \
+  @zsh-users+fast \
+  skip'peco' @fuzzy \
+  skip'hexyl hyperfine' @console-tools
+
+export LS_COLORS="$(vivid generate snazzy)"
+
+# grab delta (better less)
+zi ice from"gh-r" as"command" \
+  mv"delta-*/delta -> delta" \
+  dl"https://github.com/dandavison/delta/raw/HEAD/etc/completion/completion.zsh -> _delta" \
+  atload"
+    # https://dandavison.github.io/delta/mouse-scrolling.html
+    export DELTA_PAGER='less -R -F -+X --mouse'
+  " \
+  @dandavison/delta
+# zi light dandavison/delta
+
+# shellcheck
+zi wait lucid light-mode for \
+  from'gh-r' \
+  as'program' \
+  has'xz' \
+  mv'shellcheck* -> shellcheck' \
+  pick'shellcheck/shellcheck' \
+  id-as'auto' \
+  @koalaman/shellcheck
+
+# TODO: fix git-* completions, apparently there's some conflict with brew's git
+# https://github.com/Aloxaf/fzf-tab/wiki/Preview#git
+zinit ice wait lucid as"completions" \
+  id-as"git-completions" \
+  has"git" \
+  dl"https://github.com/git/git/raw/HEAD/contrib/completion/git-completion.zsh -> _git" \
+  atpull"zinit creinstall -q ." \
+  atload'
+    zstyle ":completion:*:*:git:*" script "$PWD/git-completion.bash"
+  ' \
+  nocompile
+zinit light zdharma-continuum/null
+
+# alias tips
+zi light djui/alias-tips
+zi ice wait=0 lucid \
+    pick='you-should-use.plugin.zsh' \
+    atload='
+        export YSU_MESSAGE_FORMAT="$(tput bold)$(tput setaf 3)\
+💡 %alias_type for $(tput setaf 5)\"%command\"$(tput setaf 3) \
+-> $(tput setaf 5)\"%alias\"$(tput sgr0)"
+    '
+
+# tab completions via fzf
+zi ice wait=1 lucid \
+  has"fzf" \
+  atload"
+    zstyle ':completion:*' rehash true
+    zstyle ':completion:*' verbose false
+    zstyle ':completion:*' use-cache on
+    zstyle ':completion:*' list-colors \${(s.:.)LS_COLORS}
+    zstyle ':completion:*:descriptions' format '[%d]'
+    zstyle ':completion::complete:*:*:files' ignored-patterns '.DS_Store' 'Icon?' '.Trash'
+    zstyle ':completion::complete:*:*:globbed-files' ignored-patterns '.DS_Store' 'Icon?' '.Trash'
+    zstyle ':completion::complete:rm:*:globbed-files' ignored-patterns
+    zstyle ':fzf-tab:*' fzf-command fzf
+    zstyle ':fzf-tab:*' fzf-flags '--ansi'
+    zstyle ':fzf-tab:*' fzf-bindings \
+      'tab:accept' \
+      'ctrl-y:preview-page-up' \
+      'ctrl-v:preview-page-down' \
+      'ctrl-e:execute-silent(\${VISUAL:-code} \$realpath >/dev/null 2>&1)' \
+      'ctrl-w:execute(\${EDITOR:-nano} \$realpath >/dev/tty </dev/tty)+refresh-preview'
+    zstyle ':fzf-tab:*' fzf-min-height 15
+    zstyle ':fzf-tab:complete:git-(add|diff|restore):*' fzf-preview \
+      'git diff --no-ext-diff \$word | delta --paging=never --no-gitconfig --line-numbers --file-style=omit --hunk-header-style=omit --theme=base16'
+    zstyle ':fzf-tab:complete:git-log:*' fzf-preview \
+      'git --no-pager log --color=always --format=oneline --abbrev-commit --follow \$word'
+    zstyle ':fzf-tab:complete:man:*' fzf-preview \
+      'man -P \"col -bx\" \$word | $FZF_PREVIEW_FILE_COMMAND --language=man'
+    zstyle ':fzf-tab:complete:brew-(install|uninstall|search|info):*-argument-rest' fzf-preview \
+      'brew info \$word'
+    zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview \
+      'echo \${(P)word}'
+    zstyle ':fzf-tab:complete:*:options' fzf-preview
+    zstyle ':fzf-tab:complete:*:options' fzf-flags '--no-preview'
+    zstyle ':fzf-tab:complete:*:argument-1' fzf-preview
+    zstyle ':fzf-tab:complete:*:argument-1' fzf-flags '--no-preview'
+    zstyle ':fzf-tab:complete:*:*' fzf-preview \
+      '($FZF_PREVIEW_FILE_COMMAND \$realpath || $FZF_PREVIEW_DIR_COMMAND \$realpath) 2>/dev/null'
+  " \
+  @Aloxaf/fzf-tab
+
+# use zinit to track completions from non-zinit programs
+zinit ice wait lucid blockf as"completions" \
+  id-as"local-completions" \
+  dl"https://github.com/docker/cli/raw/HEAD/contrib/completion/zsh/_docker -> _docker" \
+  dl"https://github.com/docker/compose/raw/master/contrib/completion/zsh/_docker-compose -> _docker-compose" \
+  dl"https://github.com/zsh-users/zsh-completions/raw/HEAD/src/_node -> _node" \
+  dl"https://github.com/zsh-users/zsh-completions/raw/HEAD/src/_yarn -> _yarn" \
+  dl"https://github.com/zsh-users/zsh-completions/raw/HEAD/src/_shellcheck -> _shellcheck" \
+  atclone"
+    command -v npm &>/dev/null && npm completion > _npm || true
+    command -v gh &>/dev/null && gh completion -s zsh > _gh || true
+    command -v op &>/dev/null && op completion zsh > _op || true
+    source /Users/m/.zi/plugins/tj---git-extras/etc/git-extras-completion.zsh
+  " \
+  atpull"zinit creinstall -q ." \
+  nocompile
+zinit light zdharma-continuum/null
+
+# iTerm2 integration
+zinit ice lucid \
+  if'[[ "$TERM_PROGRAM" = "iTerm.app" ]]' \
+  pick"shell_integration/zsh" \
+  sbin"utilities/*"
+zinit light gnachman/iTerm2-shell-integration
+
+#
+#
+PROMPT_PRESET=0
+
+if [[ ("$PROMPT_PRESET" -eq 0)]]; then
+  # Load Starship theme
+  zinit ice from"gh-r" as"program" atload'!eval $(starship init zsh)'
+  zinit light starship/starship
+fi
+
+zi lucid load'![[ $PROMPT_PRESET = 1 ]]' unload'![[ $PROMPT_PRESET != 1 ]]' \
+  pick"/dev/null" multisrc"{async,pure}.zsh" atload'!prompt_pure_precmd' nocd for \
+    sindresorhus/pure
+
+zi lucid load'![[ $PROMPT_PRESET = 2 ]]' unload'![[ $PROMPT_PRESET != 2 ]]' nocd for \
+  ergenekonyigit/lambda-gitster
+
+zi lucid load'![[ $PROMPT_PRESET = 3 ]]' unload'![[ $PROMPT_PRESET != 3 ]]' \
+  atload'!geometry::prompt' nocd \
+  atinit'GEOMETRY_COLOR_DIR=63 GEOMETRY_PATH_COLOR=63' for \
+    geometry-zsh/geometry
+
+zi load'![[ $PROMPT_PRESET = 4 ]]' unload'![[ $PROMPT_PRESET != 4 ]]' \
+  compile"{zinc_functions/*,segments/*,zinc.zsh}" nocompletions \
+  atload'!prompt_zinc_setup; prompt_zinc_precmd' nocd for \
+    robobenklein/zinc
+
+zi lucid load'![[ $PROMPT_PRESET = 5 ]]' unload'![[ $PROMPT_PRESET != 5 ]]' \
+  atload'!_zsh_git_prompt_precmd_hook' nocd for \
+    woefe/git-prompt.zsh
