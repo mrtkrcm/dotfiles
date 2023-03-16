@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-[ "$DEBUG" -eq 1 ] && set -xv # Enable ZSH debug logs
+[ "$DEBUG" = "zsh" ] && set -xv # Enable ZSH debug logs
 
 # There are five startup files that zsh will read commands from:
 # $ZDOTDIR/.zshenv (this file)

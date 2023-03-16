@@ -23,4 +23,4 @@ unset file
 #
 ####################################################################################################
 
-[ "$DEBUG" -eq 1 ] && set +xv # disable ZSH verbose logs
+[ "$DEBUG" = "zsh" ] && set +xv # disable ZSH verbose logs
